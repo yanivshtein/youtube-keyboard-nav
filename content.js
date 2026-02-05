@@ -45,16 +45,31 @@ chrome.runtime.onMessage.addListener((msg) => {
   }
 });
 
-let navMode = false;
 let navIndex = 0;
 let lastHighlighted = null;
 
 function getVideoCandidates() {
-  const cards = Array.from(document.querySelectorAll("ytd-rich-item-renderer"));
+  const cards = Array.from(
+    document.querySelectorAll(
+      [
+        "ytd-rich-item-renderer",
+        "ytd-compact-video-renderer",
+        "ytd-compact-radio-renderer",
+        "ytd-compact-playlist-renderer",
+        "ytd-video-renderer",
+        "ytd-reel-item-renderer",
+        "ytd-channel-renderer",
+        ".ytGridShelfViewModelGridShelfItem",
+        "yt-lockup-view-model.ytd-item-section-renderer",
+      ].join(",")
+    )
+  );
 
   return cards.filter((card) => {
-    // Must have a real watch link inside
-    const a = card.querySelector('a[href*="/watch"]');
+    // Must have a real watch/shorts/channel link inside
+    const a = card.querySelector(
+      'a[href*="/watch"], a[href^="/shorts/"], a[href^="/@"]'
+    );
     if (!a) return false;
 
     const rect = card.getBoundingClientRect();
@@ -86,97 +101,214 @@ function highlight(card) {
   card.scrollIntoView({ block: "center", behavior: "smooth" });
 }
 
-
-
-function showNavToast(text) {
-  // Tiny overlay so you know mode is ON/OFF
-  let toast = document.getElementById("yt-nav-toast");
-  if (!toast) {
-    toast = document.createElement("div");
-    toast.id = "yt-nav-toast";
-    toast.style.position = "fixed";
-    toast.style.bottom = "20px";
-    toast.style.right = "20px";
-    toast.style.padding = "10px 12px";
-    toast.style.borderRadius = "10px";
-    toast.style.background = "rgba(0,0,0,0.8)";
-    toast.style.color = "white";
-    toast.style.fontSize = "13px";
-    toast.style.zIndex = "999999";
-    toast.style.fontFamily = "system-ui, -apple-system, Arial";
-    document.documentElement.appendChild(toast);
+function ensureSelection(items) {
+  if (items.length === 0) return false;
+  if (!lastHighlighted || !items.includes(lastHighlighted)) {
+    navIndex = 0;
+    highlight(items[0]);
   }
-
-  toast.textContent = text;
-  toast.style.display = "block";
-
-  clearTimeout(showNavToast._t);
-  showNavToast._t = setTimeout(() => {
-    toast.style.display = "none";
-  }, 1200);
+  return true;
 }
 
-function toggleNavMode() {
-  navMode = !navMode;
-  navIndex = 0;
-  clearHighlight();
+function getCurrentIndex(items) {
+  if (!lastHighlighted) return -1;
+  return items.indexOf(lastHighlighted);
+}
 
-  showNavToast(navMode ? "Navigation mode: ON" : "Navigation mode: OFF");
+function findNextByDirection(items, direction) {
+  if (!ensureSelection(items)) return -1;
 
-  if (navMode) {
-    const items = getVideoCandidates();
-    if (items.length > 0) highlight(items[0]);
+  const currentIndex = getCurrentIndex(items);
+  if (currentIndex < 0) return 0;
+
+  const current = items[currentIndex];
+  const currentRect = current.getBoundingClientRect();
+  const cx = currentRect.left + currentRect.width / 2;
+  const cy = currentRect.top + currentRect.height / 2;
+
+  let bestIndex = -1;
+  let bestScore = Number.POSITIVE_INFINITY;
+
+  for (let i = 0; i < items.length; i += 1) {
+    if (i === currentIndex) continue;
+    const rect = items[i].getBoundingClientRect();
+
+    const tx = rect.left + rect.width / 2;
+    const ty = rect.top + rect.height / 2;
+
+    let valid = false;
+    let primary = 0;
+    let secondary = 0;
+
+    if (direction === "down") {
+      valid = rect.top >= currentRect.bottom + 4;
+      primary = rect.top - currentRect.bottom;
+      secondary = Math.abs(tx - cx);
+    } else if (direction === "up") {
+      valid = rect.bottom <= currentRect.top - 4;
+      primary = currentRect.top - rect.bottom;
+      secondary = Math.abs(tx - cx);
+    } else if (direction === "right") {
+      const verticalOverlap =
+        Math.min(rect.bottom, currentRect.bottom) -
+        Math.max(rect.top, currentRect.top);
+      valid = rect.left >= currentRect.right + 4 && verticalOverlap > 0;
+      primary = rect.left - currentRect.right;
+      secondary = Math.abs(ty - cy);
+    } else if (direction === "left") {
+      const verticalOverlap =
+        Math.min(rect.bottom, currentRect.bottom) -
+        Math.max(rect.top, currentRect.top);
+      valid = rect.right <= currentRect.left - 4 && verticalOverlap > 0;
+      primary = currentRect.left - rect.right;
+      secondary = Math.abs(ty - cy);
+    }
+
+    if (!valid) continue;
+
+    const score = primary * 1000 + secondary;
+    if (score < bestScore) {
+      bestScore = score;
+      bestIndex = i;
+    }
   }
+
+  if (bestIndex !== -1) return bestIndex;
+
+  // Fallback: closest on the same row (tight vertical band)
+  if (direction === "left" || direction === "right") {
+    const maxVertical = currentRect.height * 0.6;
+    for (let i = 0; i < items.length; i += 1) {
+      if (i === currentIndex) continue;
+      const rect = items[i].getBoundingClientRect();
+      const tx = rect.left + rect.width / 2;
+      const ty = rect.top + rect.height / 2;
+
+      const verticalDistance = Math.abs(ty - cy);
+      if (verticalDistance > maxVertical) continue;
+
+      let valid = false;
+      let primary = 0;
+      let secondary = 0;
+
+      if (direction === "right") {
+        valid = tx > cx + 4;
+        primary = tx - cx;
+        secondary = verticalDistance;
+      } else if (direction === "left") {
+        valid = tx < cx - 4;
+        primary = cx - tx;
+        secondary = verticalDistance;
+      }
+
+      if (!valid) continue;
+
+      const score = primary * 1000 + secondary;
+      if (score < bestScore) {
+        bestScore = score;
+        bestIndex = i;
+      }
+    }
+  }
+
+  return bestIndex;
 }
 
 // Capture keyboard on YouTube pages
 document.addEventListener(
   "keydown",
   (e) => {
+    if (e.key === "Escape") {
+      const active = document.activeElement;
+      if (
+        active &&
+        (active.tagName === "INPUT" ||
+          active.tagName === "TEXTAREA" ||
+          active.isContentEditable)
+      ) {
+        e.preventDefault();
+        active.blur();
+        return;
+      }
+    }
+
+    if (e.key === "h" || e.key === "H") {
+      const active = document.activeElement;
+      if (
+        active &&
+        (active.tagName === "INPUT" ||
+          active.tagName === "TEXTAREA" ||
+          active.isContentEditable)
+      ) {
+        active.blur();
+      }
+      e.preventDefault();
+      window.location.href = "https://www.youtube.com/";
+      return;
+    }
+
     if (isTypingContext()) return;
 
-    // Toggle navigation mode with Alt+Shift+N (Option+Shift+N on Mac)
-    if (e.altKey && e.shiftKey && e.code === "KeyN") {
-      e.preventDefault();
-      toggleNavMode();
-      return;
-    }
-
-    if (!navMode) return;
-    console.log("NAV MODE key:", e.key, e.code);
-
     const items = getVideoCandidates();
-    console.log("Candidates found:", items.length);
-
     if (items.length === 0) return;
 
-    if (e.key === "ArrowDown") {
+    if (e.key === "s" || e.key === "S") {
       e.preventDefault();
-      navIndex = Math.min(items.length - 1, navIndex + 1);
-      highlight(items[navIndex]);
+      const nextIndex = findNextByDirection(items, "down");
+      if (nextIndex >= 0) {
+        navIndex = nextIndex;
+        highlight(items[navIndex]);
+      }
       return;
     }
 
-    if (e.key === "ArrowUp") {
+    if (e.key === "w" || e.key === "W") {
       e.preventDefault();
-      navIndex = Math.max(0, navIndex - 1);
-      highlight(items[navIndex]);
+      const nextIndex = findNextByDirection(items, "up");
+      if (nextIndex >= 0) {
+        navIndex = nextIndex;
+        highlight(items[navIndex]);
+      }
+      return;
+    }
+
+    if (e.key === "d" || e.key === "D") {
+      e.preventDefault();
+      const nextIndex = findNextByDirection(items, "right");
+      if (nextIndex >= 0) {
+        navIndex = nextIndex;
+        highlight(items[navIndex]);
+      }
+      return;
+    }
+
+    if (e.key === "a" || e.key === "A") {
+      e.preventDefault();
+      const nextIndex = findNextByDirection(items, "left");
+      if (nextIndex >= 0) {
+        navIndex = nextIndex;
+        highlight(items[navIndex]);
+      }
       return;
     }
 
     if (e.key === "Enter") {
       e.preventDefault();
-      const a = items[navIndex].querySelector('a[href*="/watch"]');
-            if (a) a.click();
+      if (!ensureSelection(items)) return;
+      const card = items[navIndex];
+      const a =
+        card.querySelector('a[href*="/watch"]') ||
+        card.querySelector('a[href^="/shorts/"]') ||
+        card.querySelector('a[href^="/@"]');
+      if (a) a.click();
 
       return;
     }
 
     if (e.key === "Escape") {
       e.preventDefault();
-      navMode = false;
       clearHighlight();
-      showNavToast("Navigation mode: OFF");
+      navIndex = 0;
       return;
     }
   },
