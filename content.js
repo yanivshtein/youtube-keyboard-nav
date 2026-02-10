@@ -60,21 +60,55 @@ function getVideoCandidates() {
         "ytd-reel-item-renderer",
         "ytd-channel-renderer",
         ".ytGridShelfViewModelGridShelfItem",
+        "ytd-guide-entry-renderer",
+        "ytd-guide-collapsible-entry-renderer",
         "yt-lockup-view-model.ytd-item-section-renderer",
       ].join(",")
     )
   );
 
   return cards.filter((card) => {
-    // Must have a real watch/shorts/channel link inside
-    const a = card.querySelector(
-      'a[href*="/watch"], a[href^="/shorts/"], a[href^="/@"]'
-    );
-    if (!a) return false;
+    // Sidebar entries sometimes omit href (e.g. Shorts). Accept if it has an endpoint.
+    if (isSidebarCard(card)) {
+      const endpoint =
+        card.querySelector("a#endpoint") ||
+        card.querySelector("tp-yt-paper-item[role='link']");
+      if (!endpoint) return false;
+    } else {
+      // Must have a real watch/shorts/channel/feed link inside
+      const a = card.querySelector(
+        [
+          'a[href*="/watch"]',
+          'a[href^="/shorts/"]',
+          'a[href^="/@"]',
+          'a[href^="/feed/"]',
+          'a[href^="/channel/"]',
+          'a[href^="/playlist"]',
+          'a[href^="/"]',
+          'a[href^="https://studio.youtube.com"]',
+        ].join(", ")
+      );
+      if (!a) return false;
+    }
 
     const rect = card.getBoundingClientRect();
     return rect.width > 0 && rect.height > 0;
   });
+}
+
+function isSidebarCard(card) {
+  return Boolean(
+    card.closest(
+      [
+        "ytd-guide-entry-renderer",
+        "ytd-guide-collapsible-entry-renderer",
+        "ytd-guide-section-renderer",
+        "ytd-guide-collapsible-section-entry-renderer",
+        "#guide-content",
+        "#guide",
+      ].join(",")
+    )
+  );
 }
 
 
@@ -98,7 +132,12 @@ function highlight(card) {
   card.style.borderRadius = "14px";
   card.style.background = "rgba(26,115,232,0.08)";
 
-  card.scrollIntoView({ block: "center", behavior: "smooth" });
+  const rect = card.getBoundingClientRect();
+  const margin = 40;
+  const outOfView = rect.top < margin || rect.bottom > window.innerHeight - margin;
+  if (outOfView) {
+    card.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
 }
 
 function ensureSelection(items) {
@@ -113,6 +152,28 @@ function ensureSelection(items) {
 function getCurrentIndex(items) {
   if (!lastHighlighted) return -1;
   return items.indexOf(lastHighlighted);
+}
+
+function findNearestByY(candidates, targetY, minX) {
+  let bestIndex = -1;
+  let bestScore = Number.POSITIVE_INFINITY;
+
+  for (let i = 0; i < candidates.length; i += 1) {
+    const rect = candidates[i].getBoundingClientRect();
+    const cy = rect.top + rect.height / 2;
+    const cx = rect.left + rect.width / 2;
+
+    if (minX !== null && cx <= minX + 4) continue;
+    if (rect.bottom < 0 || rect.top > window.innerHeight) continue;
+
+    const score = Math.abs(cy - targetY);
+    if (score < bestScore) {
+      bestScore = score;
+      bestIndex = i;
+    }
+  }
+
+  return bestIndex;
 }
 
 function findNextByDirection(items, direction) {
@@ -141,12 +202,12 @@ function findNextByDirection(items, direction) {
     let secondary = 0;
 
     if (direction === "down") {
-      valid = rect.top >= currentRect.bottom + 4;
-      primary = rect.top - currentRect.bottom;
+      valid = ty > cy + 4;
+      primary = ty - cy;
       secondary = Math.abs(tx - cx);
     } else if (direction === "up") {
-      valid = rect.bottom <= currentRect.top - 4;
-      primary = currentRect.top - rect.bottom;
+      valid = ty < cy - 4;
+      primary = cy - ty;
       secondary = Math.abs(tx - cx);
     } else if (direction === "right") {
       const verticalOverlap =
@@ -247,66 +308,131 @@ document.addEventListener(
       return;
     }
 
+    if (e.key === "b" || e.key === "B") {
+      const active = document.activeElement;
+      if (
+        active &&
+        (active.tagName === "INPUT" ||
+          active.tagName === "TEXTAREA" ||
+          active.isContentEditable)
+      ) {
+        active.blur();
+      }
+      e.preventDefault();
+      window.history.back();
+      return;
+    }
+
     if (isTypingContext()) return;
 
     const items = getVideoCandidates();
     if (items.length === 0) return;
+    const sidebarItems = items.filter((item) => isSidebarCard(item));
+    const mainItems = items.filter((item) => !isSidebarCard(item));
+    const inSidebar = lastHighlighted ? isSidebarCard(lastHighlighted) : false;
+    const scopedItems = lastHighlighted
+      ? items.filter((item) => isSidebarCard(item) === inSidebar)
+      : items;
+    const activeItems = scopedItems.length > 0 ? scopedItems : items;
 
     if (e.key === "s" || e.key === "S") {
       e.preventDefault();
-      const nextIndex = findNextByDirection(items, "down");
+      const nextIndex = findNextByDirection(activeItems, "down");
       if (nextIndex >= 0) {
         navIndex = nextIndex;
-        highlight(items[navIndex]);
+        highlight(activeItems[navIndex]);
       }
       return;
     }
 
     if (e.key === "w" || e.key === "W") {
       e.preventDefault();
-      const nextIndex = findNextByDirection(items, "up");
+      const nextIndex = findNextByDirection(activeItems, "up");
       if (nextIndex >= 0) {
         navIndex = nextIndex;
-        highlight(items[navIndex]);
+        highlight(activeItems[navIndex]);
       }
       return;
     }
 
     if (e.key === "d" || e.key === "D") {
       e.preventDefault();
-      const nextIndex = findNextByDirection(items, "right");
+      const nextIndex = findNextByDirection(activeItems, "right");
       if (nextIndex >= 0) {
         navIndex = nextIndex;
-        highlight(items[navIndex]);
+        highlight(activeItems[navIndex]);
+        return;
+      }
+      if (inSidebar && mainItems.length > 0) {
+        const targetRect = lastHighlighted
+          ? lastHighlighted.getBoundingClientRect()
+          : null;
+        const targetY = targetRect
+          ? targetRect.top + targetRect.height / 2
+          : window.innerHeight / 2;
+        const minX = targetRect ? targetRect.right : null;
+        const crossIndex = findNearestByY(mainItems, targetY, minX);
+        if (crossIndex >= 0) {
+          navIndex = crossIndex;
+          highlight(mainItems[navIndex]);
+        }
       }
       return;
     }
 
     if (e.key === "a" || e.key === "A") {
       e.preventDefault();
-      const nextIndex = findNextByDirection(items, "left");
+      const nextIndex = findNextByDirection(activeItems, "left");
       if (nextIndex >= 0) {
         navIndex = nextIndex;
-        highlight(items[navIndex]);
+        highlight(activeItems[navIndex]);
+        return;
+      }
+      if (!inSidebar && sidebarItems.length > 0) {
+        const targetRect = lastHighlighted
+          ? lastHighlighted.getBoundingClientRect()
+          : null;
+        const targetY = targetRect
+          ? targetRect.top + targetRect.height / 2
+          : window.innerHeight / 2;
+        const minX = null;
+        const crossIndex = findNearestByY(sidebarItems, targetY, minX);
+        if (crossIndex >= 0) {
+          navIndex = crossIndex;
+          highlight(sidebarItems[navIndex]);
+        }
       }
       return;
     }
 
     if (e.key === "Enter") {
       e.preventDefault();
-      if (!ensureSelection(items)) return;
-      const card = items[navIndex];
+      if (!ensureSelection(activeItems)) return;
+      const card = activeItems[navIndex];
       const a =
         card.querySelector('a[href*="/watch"]') ||
         card.querySelector('a[href^="/shorts/"]') ||
-        card.querySelector('a[href^="/@"]');
-      if (!a) return;
+        card.querySelector('a[href^="/@"]') ||
+        card.querySelector('a[href^="/feed/"]') ||
+        card.querySelector('a[href^="/channel/"]') ||
+        card.querySelector('a[href^="/playlist"]') ||
+        card.querySelector('a[href^="/"]') ||
+        card.querySelector('a[href^="https://studio.youtube.com"]');
 
-      if (e.ctrlKey || e.metaKey) {
+      if (a && (e.ctrlKey || e.metaKey)) {
         window.open(a.href, "_blank");
-      } else {
-        a.click();
+        return;
       }
+
+      if (a) {
+        a.click();
+        return;
+      }
+
+      const endpoint =
+        card.querySelector("a#endpoint") ||
+        card.querySelector("tp-yt-paper-item[role='link']");
+      if (endpoint) endpoint.click();
 
       return;
     }

@@ -17,12 +17,13 @@ Keyboard shortcuts:
 - W / S: move selection vertically through the list or grid of videos.
 - Enter: open the currently selected video.
 - Ctrl + Enter: open the selected video in a new tab.
+- B: go back to the previous page.
 - Space: toggle play / pause when the video player has focus.
 - `/` (slash): focus the YouTube search box (YouTube default).
 - Esc: clear selection / blur search.
 - `f` or Shift+F: toggle fullscreen when the player has focus.
 
-Note: Some default YouTube keys remain active; this extension augments navigation for lists/grids and search navigation.
+Note: Some default YouTube keys remain active; this extension augments navigation for lists/grids, search results, and the Home page sidebar.
 
 ## Customizing keyboard shortcuts
 - In Chrome/Edge go to `chrome://extensions/shortcuts` to view or change assigned shortcuts for this extension.
