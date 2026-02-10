@@ -16,6 +16,7 @@ Keyboard shortcuts:
 - A / D: move selection horizontally between thumbnails (where applicable).
 - W / S: move selection vertically through the list or grid of videos.
 - Enter: open the currently selected video.
+- Ctrl + Enter: open the selected video in a new tab.
 - Space: toggle play / pause when the video player has focus.
 - `/` (slash): focus the YouTube search box (YouTube default).
 - Esc: clear selection / blur search.

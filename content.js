@@ -300,7 +300,13 @@ document.addEventListener(
         card.querySelector('a[href*="/watch"]') ||
         card.querySelector('a[href^="/shorts/"]') ||
         card.querySelector('a[href^="/@"]');
-      if (a) a.click();
+      if (!a) return;
+
+      if (e.ctrlKey || e.metaKey) {
+        window.open(a.href, "_blank");
+      } else {
+        a.click();
+      }
 
       return;
     }
