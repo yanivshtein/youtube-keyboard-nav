@@ -20,6 +20,19 @@ function togglePlay() {
   else v.pause();
 }
 
+function focusSearch() {
+  const input =
+    document.querySelector('input#search') ||
+    document.querySelector('input[name="search_query"]') ||
+    document.querySelector('ytd-searchbox input') ||
+    document.querySelector('input[aria-label="Search"]');
+
+  if (!input) return false;
+  input.focus();
+  input.select();
+  return true;
+}
+
 function seek(deltaSeconds) {
   const v = getVideo();
   if (!v || Number.isNaN(v.duration)) return;
@@ -293,7 +306,7 @@ document.addEventListener(
       }
     }
 
-    if (e.key === "h" || e.key === "H") {
+    if (e.code === "KeyH") {
       const active = document.activeElement;
       if (
         active &&
@@ -308,7 +321,7 @@ document.addEventListener(
       return;
     }
 
-    if (e.key === "b" || e.key === "B") {
+    if (e.code === "KeyB") {
       const active = document.activeElement;
       if (
         active &&
@@ -325,6 +338,18 @@ document.addEventListener(
 
     if (isTypingContext()) return;
 
+    if (
+      e.code === "Slash" ||
+      e.code === "IntlRo" ||
+      e.key === "/" ||
+      e.key === "?" ||
+      e.key === "."
+    ) {
+      const focused = focusSearch();
+      if (focused) e.preventDefault();
+      return;
+    }
+
     const items = getVideoCandidates();
     if (items.length === 0) return;
     const sidebarItems = items.filter((item) => isSidebarCard(item));
@@ -335,7 +360,7 @@ document.addEventListener(
       : items;
     const activeItems = scopedItems.length > 0 ? scopedItems : items;
 
-    if (e.key === "s" || e.key === "S") {
+    if (e.code === "KeyS") {
       e.preventDefault();
       const nextIndex = findNextByDirection(activeItems, "down");
       if (nextIndex >= 0) {
@@ -345,7 +370,7 @@ document.addEventListener(
       return;
     }
 
-    if (e.key === "w" || e.key === "W") {
+    if (e.code === "KeyW") {
       e.preventDefault();
       const nextIndex = findNextByDirection(activeItems, "up");
       if (nextIndex >= 0) {
@@ -355,7 +380,7 @@ document.addEventListener(
       return;
     }
 
-    if (e.key === "d" || e.key === "D") {
+    if (e.code === "KeyD") {
       e.preventDefault();
       const nextIndex = findNextByDirection(activeItems, "right");
       if (nextIndex >= 0) {
@@ -380,7 +405,7 @@ document.addEventListener(
       return;
     }
 
-    if (e.key === "a" || e.key === "A") {
+    if (e.code === "KeyA") {
       e.preventDefault();
       const nextIndex = findNextByDirection(activeItems, "left");
       if (nextIndex >= 0) {
