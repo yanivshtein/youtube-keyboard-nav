@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "YouTube Keyboard Navigator",
   "version": "1.0.0",
-  "description": "Keyboard shortcuts to control YouTube (play/pause, seek, speed, captions).",
+"description": "Full keyboard navigation for YouTube – control playback and navigate videos, sidebar, and search using intuitive shortcuts.",
   "icons": {
   "16": "icons/icon16.png",
   "48": "icons/icon48.png",
