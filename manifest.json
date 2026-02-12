@@ -8,11 +8,7 @@
   "48": "icons/icon48.png",
   "128": "icons/icon128.png"
   },
-  "permissions": ["tabs"],
   "host_permissions": ["https://www.youtube.com/*"],
-  "background": {
-    "service_worker": "background.js"
-  },
   "action": {
     "default_title": "YouTube Keyboard Navigator",
     "default_popup": "popup.html"
@@ -23,19 +19,5 @@
       "js": ["content.js"],
       "run_at": "document_idle"
     }
-  ],
-  "commands": {
-    "yt-toggle-play": {
-      "suggested_key": { "default": "Alt+Shift+P" },
-      "description": "Play/Pause"
-    },
-    "yt-seek-back": {
-      "suggested_key": { "default": "Alt+Shift+J" },
-      "description": "Seek back 5s"
-    },
-    "yt-seek-forward": {
-      "suggested_key": { "default": "Alt+Shift+L" },
-      "description": "Seek forward 5s"
-    }
-  }
+  ]
 }
