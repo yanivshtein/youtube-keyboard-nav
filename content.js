@@ -306,37 +306,19 @@ document.addEventListener(
       }
     }
 
+    if (isTypingContext()) return;
+
     if (e.code === "KeyH") {
-      const active = document.activeElement;
-      if (
-        active &&
-        (active.tagName === "INPUT" ||
-          active.tagName === "TEXTAREA" ||
-          active.isContentEditable)
-      ) {
-        active.blur();
-      }
       e.preventDefault();
       window.location.href = "https://www.youtube.com/";
       return;
     }
 
     if (e.code === "KeyB") {
-      const active = document.activeElement;
-      if (
-        active &&
-        (active.tagName === "INPUT" ||
-          active.tagName === "TEXTAREA" ||
-          active.isContentEditable)
-      ) {
-        active.blur();
-      }
       e.preventDefault();
       window.history.back();
       return;
     }
-
-    if (isTypingContext()) return;
 
     if (
       e.code === "Slash" ||
