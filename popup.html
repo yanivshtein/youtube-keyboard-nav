@@ -8,50 +8,41 @@
   </head>
   <body>
     <main class="popup">
-      <h1 class="title">YouTube Keyboard Nav</h1>
-      <p class="subtitle">Always on. Use these keys:</p>
+      <header class="header">
+        <h1 class="title">YouTube Keyboard Nav</h1>
+        <p class="subtitle">Customize controls and save your layout.</p>
+      </header>
 
+      <p class="section-title">Navigation Controls</p>
+      <div id="rows" class="section"></div>
+
+      <p class="section-title">Extra Action</p>
       <div class="section">
         <div class="row">
-          <span class="keys">W / S</span>
-          <span class="label">Move up / down</span>
+          <span class="label">Open selected in new tab</span>
+          <span id="newTabKey" class="key-chip">Ctrl/Cmd + Enter</span>
         </div>
-        <div class="row">
-          <span class="keys">A / D</span>
-          <span class="label">Move left / right</span>
-        </div>
-        <div class="row">
-          <span class="keys">Enter</span>
-          <span class="label">Open selected video</span>
-        </div>
-        <div class="row">
-          <span class="keys">Ctrl + Enter</span>
-          <span class="label">Open in new tab</span>
-        </div>
-        <div class="row">
-          <span class="keys">B</span>
-          <span class="label">Back to previous page</span>
-        </div>
-        <div class="row">
-          <span class="keys">H</span>
-          <span class="label">Go to YouTube Home</span>
-        </div>
-        <div class="row">
-          <span class="keys">/</span>
-          <span class="label">Focus search (YouTube default)</span>
-        </div>
-        <div class="row">
-          <span class="keys">Esc</span>
-          <span class="label">Exit search / clear selection</span>
-        </div>
+        <p class="hint">
+          This shortcut always follows your <strong>Open selected item</strong> key.
+          If you change Open to another key, this will change too.
+        </p>
       </div>
+
+      <div class="actions">
+        <button id="saveBtn" class="btn primary" type="button">Save</button>
+        <button id="resetBtn" class="btn" type="button">Reset defaults</button>
+      </div>
+
+      <p id="status" class="status" aria-live="polite"></p>
 
       <div class="section">
         <p class="note">
-          Works on Home, Search, Shorts rows, Watch sidebar, and the Home
-          sidebar.
+          Example: if Open is <strong>F</strong>, new tab becomes
+          <strong>Ctrl/Cmd + F</strong>.
         </p>
       </div>
     </main>
+    <script src="keybindings.js"></script>
+    <script src="popup.js"></script>
   </body>
 </html>

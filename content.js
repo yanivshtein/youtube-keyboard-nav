@@ -39,6 +39,29 @@ function seek(deltaSeconds) {
   v.currentTime = clamp(v.currentTime + deltaSeconds, 0, v.duration);
 }
 
+const {
+  DEFAULT_BINDINGS,
+  loadBindings,
+  eventMatchesBinding,
+  sanitizeBindings,
+} = window.YTKeybindings;
+
+let keyBindings = { ...DEFAULT_BINDINGS };
+
+loadBindings()
+  .then((bindings) => {
+    keyBindings = sanitizeBindings(bindings);
+  })
+  .catch(() => {
+    keyBindings = { ...DEFAULT_BINDINGS };
+  });
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== "sync" && areaName !== "local") return;
+  if (!changes.ytKeyBindings) return;
+  keyBindings = sanitizeBindings(changes.ytKeyBindings.newValue);
+});
+
 chrome.runtime.onMessage.addListener((msg) => {
   if (!msg || msg.type !== "YT_COMMAND") return;
   if (isTypingContext()) return;
@@ -292,7 +315,9 @@ function findNextByDirection(items, direction) {
 document.addEventListener(
   "keydown",
   (e) => {
-    if (e.key === "Escape") {
+    const isClearKey = eventMatchesBinding(e, keyBindings.clear);
+
+    if (isClearKey) {
       const active = document.activeElement;
       if (
         active &&
@@ -308,25 +333,19 @@ document.addEventListener(
 
     if (isTypingContext()) return;
 
-    if (e.code === "KeyH") {
+    if (eventMatchesBinding(e, keyBindings.home)) {
       e.preventDefault();
       window.location.href = "https://www.youtube.com/";
       return;
     }
 
-    if (e.code === "KeyB") {
+    if (eventMatchesBinding(e, keyBindings.back)) {
       e.preventDefault();
       window.history.back();
       return;
     }
 
-    if (
-      e.code === "Slash" ||
-      e.code === "IntlRo" ||
-      e.key === "/" ||
-      e.key === "?" ||
-      e.key === "."
-    ) {
+    if (eventMatchesBinding(e, keyBindings.focusSearch)) {
       const focused = focusSearch();
       if (focused) e.preventDefault();
       return;
@@ -342,7 +361,7 @@ document.addEventListener(
       : items;
     const activeItems = scopedItems.length > 0 ? scopedItems : items;
 
-    if (e.code === "KeyS") {
+    if (eventMatchesBinding(e, keyBindings.moveDown)) {
       e.preventDefault();
       const nextIndex = findNextByDirection(activeItems, "down");
       if (nextIndex >= 0) {
@@ -352,7 +371,7 @@ document.addEventListener(
       return;
     }
 
-    if (e.code === "KeyW") {
+    if (eventMatchesBinding(e, keyBindings.moveUp)) {
       e.preventDefault();
       const nextIndex = findNextByDirection(activeItems, "up");
       if (nextIndex >= 0) {
@@ -362,7 +381,7 @@ document.addEventListener(
       return;
     }
 
-    if (e.code === "KeyD") {
+    if (eventMatchesBinding(e, keyBindings.moveRight)) {
       e.preventDefault();
       const nextIndex = findNextByDirection(activeItems, "right");
       if (nextIndex >= 0) {
@@ -387,7 +406,7 @@ document.addEventListener(
       return;
     }
 
-    if (e.code === "KeyA") {
+    if (eventMatchesBinding(e, keyBindings.moveLeft)) {
       e.preventDefault();
       const nextIndex = findNextByDirection(activeItems, "left");
       if (nextIndex >= 0) {
@@ -412,7 +431,7 @@ document.addEventListener(
       return;
     }
 
-    if (e.key === "Enter") {
+    if (eventMatchesBinding(e, keyBindings.open)) {
       e.preventDefault();
       if (!ensureSelection(activeItems)) return;
       const card = activeItems[navIndex];
@@ -444,7 +463,7 @@ document.addEventListener(
       return;
     }
 
-    if (e.key === "Escape") {
+    if (isClearKey) {
       e.preventDefault();
       clearHighlight();
       navIndex = 0;
