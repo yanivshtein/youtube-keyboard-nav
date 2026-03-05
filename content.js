@@ -6,6 +6,12 @@ function clamp(v, min, max) {
   return Math.min(max, Math.max(min, v));
 }
 
+function isRtlLayout() {
+  const docDir = (document.documentElement && document.documentElement.dir) || "";
+  if (docDir.toLowerCase() === "rtl") return true;
+  return getComputedStyle(document.documentElement).direction === "rtl";
+}
+
 function isTypingContext() {
   const el = document.activeElement;
   if (!el) return false;
@@ -190,7 +196,7 @@ function getCurrentIndex(items) {
   return items.indexOf(lastHighlighted);
 }
 
-function findNearestByY(candidates, targetY, minX) {
+function findNearestByY(candidates, targetY, minX = null, maxX = null) {
   let bestIndex = -1;
   let bestScore = Number.POSITIVE_INFINITY;
 
@@ -200,6 +206,7 @@ function findNearestByY(candidates, targetY, minX) {
     const cx = rect.left + rect.width / 2;
 
     if (minX !== null && cx <= minX + 4) continue;
+    if (maxX !== null && cx >= maxX - 4) continue;
     if (rect.bottom < 0 || rect.top > window.innerHeight) continue;
 
     const score = Math.abs(cy - targetY);
@@ -356,6 +363,7 @@ document.addEventListener(
     const sidebarItems = items.filter((item) => isSidebarCard(item));
     const mainItems = items.filter((item) => !isSidebarCard(item));
     const inSidebar = lastHighlighted ? isSidebarCard(lastHighlighted) : false;
+    const sidebarOnRight = isRtlLayout();
     const scopedItems = lastHighlighted
       ? items.filter((item) => isSidebarCard(item) === inSidebar)
       : items;
@@ -389,7 +397,9 @@ document.addEventListener(
         highlight(activeItems[navIndex]);
         return;
       }
-      if (inSidebar && mainItems.length > 0) {
+      const crossToMain = !sidebarOnRight && inSidebar;
+      const crossToSidebar = sidebarOnRight && !inSidebar;
+      if (crossToMain && mainItems.length > 0) {
         const targetRect = lastHighlighted
           ? lastHighlighted.getBoundingClientRect()
           : null;
@@ -401,6 +411,19 @@ document.addEventListener(
         if (crossIndex >= 0) {
           navIndex = crossIndex;
           highlight(mainItems[navIndex]);
+        }
+      } else if (crossToSidebar && sidebarItems.length > 0) {
+        const targetRect = lastHighlighted
+          ? lastHighlighted.getBoundingClientRect()
+          : null;
+        const targetY = targetRect
+          ? targetRect.top + targetRect.height / 2
+          : window.innerHeight / 2;
+        const minX = targetRect ? targetRect.right : null;
+        const crossIndex = findNearestByY(sidebarItems, targetY, minX);
+        if (crossIndex >= 0) {
+          navIndex = crossIndex;
+          highlight(sidebarItems[navIndex]);
         }
       }
       return;
@@ -414,7 +437,9 @@ document.addEventListener(
         highlight(activeItems[navIndex]);
         return;
       }
-      if (!inSidebar && sidebarItems.length > 0) {
+      const crossToSidebar = !sidebarOnRight && !inSidebar;
+      const crossToMain = sidebarOnRight && inSidebar;
+      if (crossToSidebar && sidebarItems.length > 0) {
         const targetRect = lastHighlighted
           ? lastHighlighted.getBoundingClientRect()
           : null;
@@ -426,6 +451,19 @@ document.addEventListener(
         if (crossIndex >= 0) {
           navIndex = crossIndex;
           highlight(sidebarItems[navIndex]);
+        }
+      } else if (crossToMain && mainItems.length > 0) {
+        const targetRect = lastHighlighted
+          ? lastHighlighted.getBoundingClientRect()
+          : null;
+        const targetY = targetRect
+          ? targetRect.top + targetRect.height / 2
+          : window.innerHeight / 2;
+        const maxX = targetRect ? targetRect.left : null;
+        const crossIndex = findNearestByY(mainItems, targetY, null, maxX);
+        if (crossIndex >= 0) {
+          navIndex = crossIndex;
+          highlight(mainItems[navIndex]);
         }
       }
       return;
